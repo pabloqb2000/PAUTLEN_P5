@@ -5,8 +5,8 @@
 #define PARAMETER 2
 #define FUNCTION 3
 
+#define INT 0
 #define BOOLEAN 1
-#define INT 2
 
 #define ESCALAR 1
 #define VECTOR 2

@@ -61,7 +61,7 @@ ERROR		        [a-zA-Z][a-zA-Z0-9]{99,}|.
 {COMENTARIO}	        { yycol=0; yylin++; }
 {SALTOLINEA}	        { yycol=0; yylin++; }
 {MAIN}                  { yycol += yyleng; return TOK_MAIN; }          
-{INT}                   { yycol += yyleng; return TOK_INT; }            
+{INT}                   { yycol += yyleng; yylval.atributos.tipo = ENTERO; return TOK_INT; }            
 {BOOLEAN}               { yycol += yyleng; return TOK_BOOLEAN; }            
 {ARRAY}                 { yycol += yyleng; return TOK_ARRAY; }        
 {FUNCTION}              { yycol += yyleng; return TOK_FUNCTION; }          
@@ -93,9 +93,9 @@ ERROR		        [a-zA-Z][a-zA-Z0-9]{99,}|.
 {MAYORIGUAL}            { yycol += yyleng; return TOK_MAYORIGUAL; }                             
 {MENOR}                 { yycol += yyleng; return TOK_MENOR; }                          
 {MAYOR}                 { yycol += yyleng; return TOK_MAYOR; }          
-{CONSTANTE_ENTERA}      { yycol += yyleng; yylval.atributos.valor = atoi(yytext); return TOK_CONSTANTE_ENTERA; }                        
-{TRUE}                  { yycol += yyleng; return TOK_TRUE; }                        
-{FALSE}                 { yycol += yyleng; return TOK_FALSE; }                  
-{IDENTIFICADOR}         { yycol += yyleng; yyval.atributos.tipo = ENTERO; yylval.atributos.nombre = yytext; return TOK_IDENTIFICADOR; }                                         
+{CONSTANTE_ENTERA}      { yycol += yyleng; yylval.atributos.valor = yytext; return TOK_CONSTANTE_ENTERA; }                        
+{TRUE}                  { yycol += yyleng; yylval.atributos.valor = "1"; return TOK_TRUE; }                        
+{FALSE}                 { yycol += yyleng; yylval.atributos.valor = "0"; return TOK_FALSE; }                  
+{IDENTIFICADOR}         { yycol += yyleng; yylval.atributos.nombre = yytext; return TOK_IDENTIFICADOR; }                                         
 {ERROR}                 {fprintf(stderr, "****Error en linea (Flex) %ld: \n", yylin); yycol += yyleng; yy_morph_error = 1; return  TOK_ERROR;}
 %%
