@@ -117,7 +117,7 @@ Es análoga a las binarias, excepto que sólo requiere de un acceso a la pila ya
 que sólo usa un operando.
 */
 
-void no(FILE* fpasm, int es_variable, int cuantos_no);
+void no(FILE* fpasm, int es_variable);
 /*
 Función monádica lógica de negación. No hay un código de operación de la ALU
 que realice esta operación por lo que se debe codificar un algoritmo que, si

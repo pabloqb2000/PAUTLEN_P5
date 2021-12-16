@@ -61,7 +61,7 @@ ERROR		        [a-zA-Z][a-zA-Z0-9]{99,}|.
 {COMENTARIO}	        { yycol=0; yylin++; }
 {SALTOLINEA}	        { yycol=0; yylin++; }
 {MAIN}                  { yycol += yyleng; return TOK_MAIN; }          
-{INT}                   { yycol += yyleng; yylval.atributos.tipo = ENTERO; return TOK_INT; }            
+{INT}                   { yycol += yyleng; yylval.atributos.tipo = INT; return TOK_INT; }            
 {BOOLEAN}               { yycol += yyleng; return TOK_BOOLEAN; }            
 {ARRAY}                 { yycol += yyleng; return TOK_ARRAY; }        
 {FUNCTION}              { yycol += yyleng; return TOK_FUNCTION; }          

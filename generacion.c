@@ -263,7 +263,7 @@ El último argumento es el valor de etiqueta que corresponde (SIN LUGAR A DUDAS,
 la implementación del algoritmo requerirá etiquetas,). Véase en los ejemplos de
 programa principal como puede gestionarse el número de etiquetas cuantos_no.
 */
-void no(FILE* fpasm, int es_variable, int cuantos_no){
+void no(FILE* fpasm, int es_variable){
     fprintf(fpasm, "\n\tpop eax\n");
     if (es_variable)
         fprintf(fpasm, "\tmov eax, [eax]\n");
