@@ -1,3 +1,5 @@
+all: yanc test
+
 test: yanc
 	./yanc ejemplos_compilador/ejemplo_factorial/factorial.alfa ejemplos_compilador/ejemplo_factorial/out.asm
 

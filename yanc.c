@@ -17,8 +17,10 @@ int main(int argc, char ** argv) {
         fclose(yyin);
         return 1;
     }
+    printf("BIENVENIDO A NUESTRO COMPILADOR\n");
     
     yyparse();
+    fprintf(out, "BIENVENIDO A NUESTRO COMPILADOR\n");
 
     fclose(yyin);
     fclose(out);
