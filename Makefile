@@ -40,4 +40,4 @@ sym_table.o: sym_table.c sym_table.h hash_table.o
 	gcc -c -o sym_table.o sym_table.c
 
 clean:
-	rm -rf -rf test yanc [!a][!l][!f]*.o lex.yy.c y.tab.h y.tab.c y.output ejemplos_compilador/*/out.asm
+	rm -rf -rf test yanc [!a][!l][!f]*.o lex.yy.c y.tab.h y.tab.c y.output ejemplos_compilador/*/out.asm ejemplos_compilador/*/out.o
