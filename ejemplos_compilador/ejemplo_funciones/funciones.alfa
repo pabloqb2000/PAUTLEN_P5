@@ -6,10 +6,10 @@ main
 	{
 		return num1+num2;
 	}
-
+	
     x = 1;
 	y = 3;
-	
+
 	resultado = suma (x,y);
 	printf resultado;
 	

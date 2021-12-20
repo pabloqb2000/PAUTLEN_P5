@@ -16,7 +16,9 @@ extern int yy_morph_error;
 stable* table;
 int tipo_variable;
 int etiqueta = 0;
-int declaracion = FALSE;
+int declaracion = NONE;
+int n_parametros = 0;
+int n_variables_locales = 0;
 %}
 
 %union {
@@ -79,6 +81,7 @@ int declaracion = FALSE;
 
 %type <atributos> funcion
 %type <atributos> f_nombre
+%type <atributos> f_parametros
 %type <atributos> f_declaracion
 %type <atributos> if_tok
 %type <atributos> if_exp
@@ -94,22 +97,30 @@ int declaracion = FALSE;
 %left TOK_NOT
 %%
 
-programa: prog_inicio declaraciones funciones sentencias TOK_LLAVEDERECHA {
+programa: prog_funciones sentencias TOK_LLAVEDERECHA {
     escribir_fin(out);
+};
+
+prog_funciones: prog_declaraciones funciones {
+    escribir_inicio_main(out);
+};
+
+prog_declaraciones: prog_inicio declaraciones {
+    escribir_segmento_codigo(out);
 };
 
 prog_inicio: TOK_MAIN TOK_LLAVEIZQUIERDA {
     table = stable_init();
     escribir_subseccion_data(out);
     escribir_cabecera_bss(out);
-}
+};
 
-declaraciones: declaracion {escribir_segmento_codigo(out); fprintf(out, ";R2:\t<declaraciones> ::= <declaracion>\n");}
-             | declaracion declaraciones {escribir_segmento_codigo(out); fprintf(out, ";R3:\t<declaraciones> ::= <declaracion> <declaraciones>\n");}
+declaraciones: declaracion {fprintf(out, ";R2:\t<declaraciones> ::= <declaracion>\n");}
+             | declaracion declaraciones {fprintf(out, ";R3:\t<declaraciones> ::= <declaracion> <declaraciones>\n");}
              ;
 
-declaracion: clase identificadores TOK_PUNTOYCOMA {  
-        declaracion = FALSE;      
+declaracion: clase identificadores TOK_PUNTOYCOMA {
+        declaracion = NONE;      
         fprintf(out, ";R4:\t<declaracion> ::= <clase> <identificadores> ;\n");
     }
     ;
@@ -123,11 +134,11 @@ clase_escalar: tipo {fprintf(out, ";R9:\t<clase_escalar> ::= <tipo>\n");}
 
 tipo: TOK_INT {
         tipo_variable = INT;
-        declaracion = TRUE;
+        if(declaracion != LOCAL_VARIABLE && declaracion != PARAMETER) declaracion = VARIABLE;
         fprintf(out, ";R10:\t<tipo> ::= int\n");}
     | TOK_BOOLEAN {
         tipo_variable = BOOLEAN;
-        declaracion = TRUE;
+        if(declaracion != LOCAL_VARIABLE && declaracion != PARAMETER) declaracion = VARIABLE;
         fprintf(out, ";R11:\t<tipo> ::= boolean\n");}
     ;
 
@@ -143,23 +154,33 @@ identificadores: identificador {
                ;
 
 funciones: funcion funciones {
-    escribir_inicio_main(out);
     fprintf(out, ";R20:\t<funciones> ::= <funcion> <funciones>\n");}
          |  {
-    escribir_inicio_main(out);
     fprintf(out, ";R21:\t<funciones> ::=\n");}
          ;
 
 f_nombre: TOK_FUNCTION tipo TOK_IDENTIFICADOR {
-            open_ambit(table, yylval.atributos.nombre, FUNCTION);
+            open_ambit(table, yylval.atributos.nombre, FUNCTION*MAX_N_TIPOS + $2.tipo);
+            declaracion = PARAMETER;
+            strcpy($$.nombre, yylval.atributos.nombre);
             fprintf(out, ";R22_1:\t<f_nombre> ::= function <tipo> <identificador> \n");
-            };
+        };
 
-f_declaracion: f_nombre TOK_PARENTESISIZQUIERDO parametros_funcion TOK_PARENTESISDERECHO TOK_LLAVEIZQUIERDA declaraciones_funcion {
+f_parametros: f_nombre TOK_PARENTESISIZQUIERDO parametros_funcion {
+
+    declaracion = LOCAL_VARIABLE;
+};
+
+f_declaracion: f_parametros TOK_PARENTESISDERECHO TOK_LLAVEIZQUIERDA declaraciones_funcion {
+            declararFuncion(out, $1.nombre, n_variables_locales);
+
+            declaracion = NONE;
             fprintf(out, ";R22_3:\t<f_declaracion> ::= <f_nombre> ( <parametros_funcion> ) { <declaraciones_funcion> \n");
-            };
+        };
 
 funcion: f_declaracion sentencias TOK_LLAVEDERECHA {
+            n_parametros = 0;
+            n_variables_locales = 0;
             close_ambit(table);
             fprintf(out, ";R22_3:\t<funcion> ::= <declaraciones_funcion> <sentencias> } \n");
             };
@@ -200,12 +221,28 @@ bloque: condicional {fprintf(out, ";R40:\t<bloque> ::= <condicional>\n");}
       ;
 
 asignacion: identificador TOK_ASIGNACION exp {
-                asignar(out, $1.nombre, $3.es_direccion);
+        int n = $1.tipo / (MAX_N_TIPOS * MAX_N_CAT);
+        int cat = ($1.tipo / MAX_N_TIPOS) % MAX_N_CAT;
+        int tipo = $1.tipo % MAX_N_TIPOS;
+        printf("%d, %d, %d\n", n, cat, tipo);
+
+        if (cat == VARIABLE) {
+            asignar(out, $1.nombre, $3.es_direccion);
+        } else if (cat == LOCAL_VARIABLE) {
+            escribirVariableLocal(out, n);
+            asignarDestinoEnPila(out, $3.es_direccion);
+        } else if (cat == PARAMETER) {
+            escribirParametro(out, n, n_parametros);
+            asignarDestinoEnPila(out, $3.es_direccion);
+        } else {
+            error_semantico("No se puede asignar valores a una funcion\n");
+        }
+
         fprintf(out, ";R43:\t<asignacion> ::= <identificador> = <exp>\n");
     }
-          | elemento_vector TOK_ASIGNACION exp {
-              fprintf(out, ";R44:\t<asignacion> ::= <elemento_vector> = <exp>\n");}
-          ;
+    | elemento_vector TOK_ASIGNACION exp {
+        fprintf(out, ";R44:\t<asignacion> ::= <elemento_vector> = <exp>\n");}
+    ;
 
 elemento_vector: identificador TOK_CORCHETEIZQUIERDO exp TOK_CORCHETEDERECHO {fprintf(out, ";R48:\t<elemento_vector> = <identificador> [<exp>]\n");};
 
@@ -331,9 +368,20 @@ exp: exp TOK_MAS exp        {
             error_semantico("Negacion de valor no booleano");
         }}
    | TOK_IDENTIFICADOR   {
-            $$.es_direccion = TRUE;    
-            $$.tipo = $1.tipo;
-                        escribir_operando(out, $1.nombre, TRUE);
+        int n = $1.tipo % (MAX_N_TIPOS * MAX_N_CAT);
+        int cat = ($1.tipo / MAX_N_TIPOS) % MAX_N_TIPOS * MAX_N_CAT;
+        int tipo = $1.tipo % MAX_N_TIPOS;
+
+        if (cat == VARIABLE) {
+            escribir_operando(out, $1.nombre, TRUE);
+        } else if (cat == LOCAL_VARIABLE) {
+            escribirVariableLocal(out, n);
+        } else {
+            escribirParametro(out, n, n_parametros);
+        }
+
+        $$.es_direccion = TRUE;   
+        $$.tipo = tipo;
         }
    | constante       {
                         $$.es_direccion = FALSE;    
@@ -433,16 +481,28 @@ constante_entera: TOK_CONSTANTE_ENTERA {$$.tipo = INT; $$.valor = yylval.atribut
                 ;
 
 identificador: TOK_IDENTIFICADOR {
-        if(declaracion == TRUE) {
-            if(stable_insert(table, yylval.atributos.nombre, tipo_variable) == ERROR) {
+        if(declaracion == VARIABLE) {
+            if(stable_insert(table, yylval.atributos.nombre, VARIABLE * MAX_N_TIPOS + tipo_variable) == ERROR) {
                 error_semantico("El identificador ya existe.");
             } else {
                 declarar_variable(out, yylval.atributos.nombre, tipo_variable, 1);
             }
-        } else {
-            $$.tipo = stable_search(table, yylval.atributos.nombre);
-            $$.es_direccion = TRUE;
+        } else if (declaracion == NONE) {
             strcpy($$.nombre, yylval.atributos.nombre);
+            $$.tipo = stable_search(table, yylval.atributos.nombre); 
+            $$.es_direccion = TRUE;
+        } else if (declaracion == PARAMETER) {
+            if(stable_insert(table, yylval.atributos.nombre, 
+                n_parametros*MAX_N_CAT*MAX_N_TIPOS + PARAMETER * MAX_N_TIPOS + tipo_variable) == ERROR) {
+                error_semantico("El identificador ya existe.");
+            }
+            n_parametros++;
+        } else if (declaracion == LOCAL_VARIABLE) {
+            if(stable_insert(table, yylval.atributos.nombre,
+                n_variables_locales*MAX_N_CAT*MAX_N_TIPOS + LOCAL_VARIABLE * MAX_N_TIPOS + tipo_variable) == ERROR) {
+                error_semantico("El identificador ya existe.");
+            }
+            n_variables_locales++;
         }
     };
 

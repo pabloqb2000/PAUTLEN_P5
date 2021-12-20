@@ -1,9 +1,14 @@
 #ifndef ALPHA_H
 #define ALPHA_H
 
+#define MAX_N_TIPOS 8
+#define MAX_N_CAT 8
+
+#define NONE 0
 #define VARIABLE 1
 #define PARAMETER 2
 #define FUNCTION 3
+#define LOCAL_VARIABLE 4
 
 #define INT 0
 #define BOOLEAN 1

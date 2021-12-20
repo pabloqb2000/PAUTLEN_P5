@@ -1,12 +1,14 @@
+TEST = funciones
+
 all: clean yanc run_test
 
 run:
 	./test
 
 run_test:
-	./yanc ejemplos_compilador/ejemplo_condicionales/condicionales.alfa ejemplos_compilador/ejemplo_condicionales/out.asm
-	nasm -g -o ejemplos_compilador/ejemplo_condicionales/out.o -f elf32 ejemplos_compilador/ejemplo_condicionales/out.asm
-	gcc -Wall -g -m32 -o test ejemplos_compilador/ejemplo_condicionales/out.o alfalib.o
+	./yanc ejemplos_compilador/ejemplo_$(TEST)/$(TEST).alfa ejemplos_compilador/ejemplo_$(TEST)/out.asm
+	nasm -g -o ejemplos_compilador/ejemplo_$(TEST)/out.o -f elf32 ejemplos_compilador/ejemplo_$(TEST)/out.asm
+	gcc -Wall -g -m32 -o test ejemplos_compilador/ejemplo_$(TEST)/out.o alfalib.o
 	./test
 
 yanc: y.tab.o lex.yy.o yanc.o generacion.o sym_table.o hash_table.o
