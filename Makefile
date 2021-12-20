@@ -1,8 +1,13 @@
-all: yanc test
+all: clean yanc run_test
 
-test: yanc
-	./yanc ejemplos_compilador/ejemplo_factorial/factorial.alfa ejemplos_compilador/ejemplo_factorial/out.asm
+run:
+	./test
 
+run_test:
+	./yanc ejemplos_compilador/ejemplo_condicionales/condicionales.alfa ejemplos_compilador/ejemplo_condicionales/out.asm
+	nasm -g -o ejemplos_compilador/ejemplo_condicionales/out.o -f elf32 ejemplos_compilador/ejemplo_condicionales/out.asm
+	gcc -Wall -g -m32 -o test ejemplos_compilador/ejemplo_condicionales/out.o alfalib.o
+	./test
 
 yanc: y.tab.o lex.yy.o yanc.o generacion.o sym_table.o hash_table.o
 	gcc -o yanc y.tab.o lex.yy.o yanc.o generacion.o sym_table.o hash_table.o
@@ -35,4 +40,4 @@ sym_table.o: sym_table.c sym_table.h hash_table.o
 	gcc -c -o sym_table.o sym_table.c
 
 clean:
-	rm -rf -rf yanc *.o lex.yy.c y.tab.h y.tab.c y.output
+	rm -rf -rf test yanc [!a][!l][!f]*.o lex.yy.c y.tab.h y.tab.c y.output ejemplos_compilador/*/out.asm

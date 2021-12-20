@@ -1,0 +1,16 @@
+main {
+    int x, y;
+    x = 5;
+    y = 2;
+    
+    if((x > 5))
+    {
+        y = 4;
+    } else {
+        printf x;
+    }
+
+    if((x == 3)) {
+        scanf y;
+    }
+}

@@ -10,17 +10,17 @@ int main(int argc, char ** argv) {
     printf("BIENVENIDO A NUESTRO COMPILADOR\n");
     yyin = fopen(argv[1], "r");
     if(yyin == NULL) {
+        printf("Error al abrir el archivo de entrada %s\n", argv[1]);
         return 1;
     }
     out = fopen(argv[2], "w");
     if(out == NULL) {
+        printf("Error al abrir el archivo de salida %s\n", argv[2]);
         fclose(yyin);
         return 1;
     }
-    printf("BIENVENIDO A NUESTRO COMPILADOR\n");
     
     yyparse();
-    fprintf(out, "BIENVENIDO A NUESTRO COMPILADOR\n");
 
     fclose(yyin);
     fclose(out);

@@ -15,9 +15,9 @@
 #define TRUE 1
 
 struct _atr_info {
-	char* nombre;
+	char nombre[1024];
 	int tipo;
-    char* valor;
+    char *valor;
     int es_direccion;
     int etiqueta;
 };

@@ -51,7 +51,7 @@ MENORIGUAL          "<="
 MAYORIGUAL          ">="
 MENOR               "<"
 MAYOR               ">"
-CONSTANTE_ENTERA    -?[0-9]+
+CONSTANTE_ENTERA    [0-9]+
 TRUE                "true"
 FALSE               "false"
 IDENTIFICADOR       [a-zA-Z][a-zA-Z0-9]{0,98}
@@ -96,6 +96,6 @@ ERROR		        [a-zA-Z][a-zA-Z0-9]{99,}|.
 {CONSTANTE_ENTERA}      { yycol += yyleng; yylval.atributos.valor = yytext; return TOK_CONSTANTE_ENTERA; }                        
 {TRUE}                  { yycol += yyleng; yylval.atributos.valor = "1"; return TOK_TRUE; }                        
 {FALSE}                 { yycol += yyleng; yylval.atributos.valor = "0"; return TOK_FALSE; }                  
-{IDENTIFICADOR}         { yycol += yyleng; yylval.atributos.nombre = yytext; return TOK_IDENTIFICADOR; }                                         
+{IDENTIFICADOR}         { yycol += yyleng; strcpy(yylval.atributos.nombre, yytext); return TOK_IDENTIFICADOR; }                                         
 {ERROR}                 {fprintf(stderr, "****Error en linea (Flex) %ld: \n", yylin); yycol += yyleng; yy_morph_error = 1; return  TOK_ERROR;}
 %%

@@ -16,6 +16,7 @@ extern int yy_morph_error;
 stable* table;
 int tipo_variable;
 int etiqueta = 0;
+int declaracion = FALSE;
 %}
 
 %union {
@@ -79,6 +80,7 @@ int etiqueta = 0;
 %type <atributos> funcion
 %type <atributos> f_nombre
 %type <atributos> f_declaracion
+%type <atributos> if_tok
 %type <atributos> if_exp
 %type <atributos> if_else_exp
 %type <atributos> while
@@ -94,10 +96,11 @@ int etiqueta = 0;
 
 programa: prog_inicio declaraciones funciones sentencias TOK_LLAVEDERECHA {
     escribir_fin(out);
-}
+};
 
 prog_inicio: TOK_MAIN TOK_LLAVEIZQUIERDA {
     table = stable_init();
+    escribir_subseccion_data(out);
     escribir_cabecera_bss(out);
 }
 
@@ -105,7 +108,8 @@ declaraciones: declaracion {escribir_segmento_codigo(out); fprintf(out, ";R2:\t<
              | declaracion declaraciones {escribir_segmento_codigo(out); fprintf(out, ";R3:\t<declaraciones> ::= <declaracion> <declaraciones>\n");}
              ;
 
-declaracion: clase identificadores TOK_PUNTOYCOMA {        
+declaracion: clase identificadores TOK_PUNTOYCOMA {  
+        declaracion = FALSE;      
         fprintf(out, ";R4:\t<declaracion> ::= <clase> <identificadores> ;\n");
     }
     ;
@@ -119,9 +123,11 @@ clase_escalar: tipo {fprintf(out, ";R9:\t<clase_escalar> ::= <tipo>\n");}
 
 tipo: TOK_INT {
         tipo_variable = INT;
+        declaracion = TRUE;
         fprintf(out, ";R10:\t<tipo> ::= int\n");}
     | TOK_BOOLEAN {
         tipo_variable = BOOLEAN;
+        declaracion = TRUE;
         fprintf(out, ";R11:\t<tipo> ::= boolean\n");}
     ;
 
@@ -147,16 +153,16 @@ funciones: funcion funciones {
 f_nombre: TOK_FUNCTION tipo TOK_IDENTIFICADOR {
             open_ambit(table, yylval.atributos.nombre, FUNCTION);
             fprintf(out, ";R22_1:\t<f_nombre> ::= function <tipo> <identificador> \n");
-            }
+            };
 
 f_declaracion: f_nombre TOK_PARENTESISIZQUIERDO parametros_funcion TOK_PARENTESISDERECHO TOK_LLAVEIZQUIERDA declaraciones_funcion {
             fprintf(out, ";R22_3:\t<f_declaracion> ::= <f_nombre> ( <parametros_funcion> ) { <declaraciones_funcion> \n");
-            }
+            };
 
 funcion: f_declaracion sentencias TOK_LLAVEDERECHA {
             close_ambit(table);
             fprintf(out, ";R22_3:\t<funcion> ::= <declaraciones_funcion> <sentencias> } \n");
-            }
+            };
 
 parametros_funcion: parametro_funcion resto_parametros_funcion {fprintf(out, ";R23:\t<parametros_funcion> ::= <parametro_funcion> <resto_parametros_funcion>\n");}
                   |  {fprintf(out, ";R24:\t<parametros_funcion> ::=\n");}   
@@ -194,7 +200,7 @@ bloque: condicional {fprintf(out, ";R40:\t<bloque> ::= <condicional>\n");}
       ;
 
 asignacion: identificador TOK_ASIGNACION exp {
-        asignar(out, $1.nombre, $3.es_direccion);
+                asignar(out, $1.nombre, $3.es_direccion);
         fprintf(out, ";R43:\t<asignacion> ::= <identificador> = <exp>\n");
     }
           | elemento_vector TOK_ASIGNACION exp {
@@ -203,41 +209,48 @@ asignacion: identificador TOK_ASIGNACION exp {
 
 elemento_vector: identificador TOK_CORCHETEIZQUIERDO exp TOK_CORCHETEDERECHO {fprintf(out, ";R48:\t<elemento_vector> = <identificador> [<exp>]\n");};
 
-if_exp:  TOK_IF TOK_PARENTESISIZQUIERDO exp{
-            if ($3.tipo != BOOLEAN){
-              error_semantico("Condicional con condicion de tipo int");
-              return -1;
-            }
-            ifthen_inicio(out, $3.es_direccion, etiqueta);
+if_tok:  TOK_IF TOK_PARENTESISIZQUIERDO {
+            $$.etiqueta = etiqueta;
             etiqueta++;
           };
+          
+if_exp: if_tok exp TOK_PARENTESISDERECHO {
+            $$.etiqueta = $1.etiqueta;
+            if ($2.tipo != BOOLEAN){
+                error_semantico("Condicional con condicion de tipo int");
+                return -1;
+            }
+            ifthen_inicio(out, $2.es_direccion, $1.etiqueta);
+        };
 
-condicional:  if_exp TOK_PARENTESISDERECHO TOK_LLAVEIZQUIERDA sentencias TOK_LLAVEDERECHA{
-                ifthen_fin(out, etiqueta);
-                etiqueta++;
+
+condicional:  if_exp TOK_LLAVEIZQUIERDA sentencias TOK_LLAVEDERECHA{
+                ifthen_fin(out, $1.etiqueta);
                 fprintf(out, ";R50:\t<condicional> ::= if ( <exp> ) { <sentencias> }\n");
               }
-           |   if_else_exp TOK_ELSE TOK_LLAVEIZQUIERDA sentencias TOK_LLAVEDERECHA
+           |   if_else_exp TOK_LLAVEIZQUIERDA sentencias TOK_LLAVEDERECHA
               {
-                ifthenelse_fin(out, etiqueta);
-                etiqueta++;
+                ifthenelse_fin(out, $1.etiqueta);
                 fprintf(out, ";R51:\t<condicional> ::= if ( <exp> ) { <sentencias> } else { <sentencias> }\n");
               };
 
-if_else_exp: if_exp TOK_PARENTESISDERECHO TOK_LLAVEIZQUIERDA sentencias TOK_LLAVEDERECHA{
-            ifthenelse_fin_then(out, etiqueta);
-            etiqueta++;
+if_else_exp: if_exp TOK_LLAVEIZQUIERDA sentencias TOK_LLAVEDERECHA TOK_ELSE {
+            $$.etiqueta = $1.etiqueta; 
+            ifthenelse_fin_then(out, $1.etiqueta);
           };
 while: TOK_WHILE TOK_PARENTESISIZQUIERDO{
         while_inicio(out, etiqueta);
+        $$.etiqueta = etiqueta;
+        etiqueta++;
       };
 
-bucle_exp:  while exp{
-              while_exp_pila(out, $2.es_direccion, etiqueta);
+bucle_exp:  while exp {
+              $$.etiqueta = $1.etiqueta;
+              while_exp_pila(out, $2.es_direccion, $1.etiqueta);
             };
 
 bucle:  bucle_exp TOK_PARENTESISDERECHO TOK_LLAVEIZQUIERDA sentencias TOK_LLAVEDERECHA{
-        while_fin(out, etiqueta);
+        while_fin(out, $1.etiqueta);
         fprintf(out, ";R52:\t<bucle> ::= while ( <exp> ) { <sentencias> }\n");
       };
 
@@ -253,7 +266,7 @@ retorno_funcion: TOK_RETURN exp {
     retornarFuncion(out, $2.es_direccion);
     fprintf(out, ";R61:\t<retorno_funcion> ::= return <exp>\n");};
 
-exp: exp TOK_MAS exp         {
+exp: exp TOK_MAS exp        {
         if($1.tipo == INT && $3.tipo == INT) {
             $$.tipo = INT;
             $$.es_direccion = FALSE;
@@ -317,13 +330,13 @@ exp: exp TOK_MAS exp         {
         } else {
             error_semantico("Negacion de valor no booleano");
         }}
-   | identificador   {
+   | TOK_IDENTIFICADOR   {
             $$.es_direccion = TRUE;    
-            $$.tipo = stable_search(table, $1.nombre);
-            escribir_operando(out, $1.nombre, TRUE);
+            $$.tipo = $1.tipo;
+                        escribir_operando(out, $1.nombre, TRUE);
         }
    | constante       {
-            $$.es_direccion = FALSE;    
+                        $$.es_direccion = FALSE;    
             $$.tipo = $1.tipo;
             escribir_operando(out, $1.valor, FALSE);
         }
@@ -403,7 +416,9 @@ comparacion: exp TOK_IGUAL exp {
                     $$.etiqueta = etiqueta;
                     etiqueta++;
                 } else {
-                    error_semantico("Operandos de comparación no enteros");
+                    char str[128];
+                    sprintf(str, "Operandos de comparación no enteros (%d y %d)", $1.tipo, $3.tipo);
+                    error_semantico(str);
                 }}
            ;
 
@@ -418,12 +433,18 @@ constante_entera: TOK_CONSTANTE_ENTERA {$$.tipo = INT; $$.valor = yylval.atribut
                 ;
 
 identificador: TOK_IDENTIFICADOR {
-    if(stable_insert(table, yylval.atributos.nombre, tipo_variable) == ERROR) {
-        error_semantico("El identificador ya existe.");
-    }
-
-    declarar_variable(out, yylval.atributos.nombre, tipo_variable, 1);}
-             ;
+        if(declaracion == TRUE) {
+            if(stable_insert(table, yylval.atributos.nombre, tipo_variable) == ERROR) {
+                error_semantico("El identificador ya existe.");
+            } else {
+                declarar_variable(out, yylval.atributos.nombre, tipo_variable, 1);
+            }
+        } else {
+            $$.tipo = stable_search(table, yylval.atributos.nombre);
+            $$.es_direccion = TRUE;
+            strcpy($$.nombre, yylval.atributos.nombre);
+        }
+    };
 
 %%
 
@@ -434,8 +455,8 @@ void error_semantico (char *error_msg)
 
 void yyerror(const char * s) {
     if(!yy_morph_error) {
-        printf("****Error sintactico en linea: %ld, columna: %ld\n\n\t%s\n", yylin, yycol, s);
+        fprintf(stderr, "****Error sintactico en linea: %ld, columna: %ld\n\n\t%s\n", yylin, yycol, s);
     } else {
-        printf("****Error morfologico\n");
+        fprintf(stderr, "****Error morfologico\n");
     }
 }
