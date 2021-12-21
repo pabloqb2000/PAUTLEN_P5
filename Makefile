@@ -1,4 +1,4 @@
-TEST = fibonacci
+TEST = facil
 
 all: clean yanc run_test
 

@@ -674,16 +674,28 @@ es_variable
 Es 1 si la expresión que se va a asignar es algo asimilable a una variable
 (identificador, o elemento de vector)
 Es 0 en caso contrario (constante u otro tipo de expresión)
+Inv vale 0 si el orden de lectura de los registros es el habitual,
+1 en caso de que se trabaje con vectores y se tenga que invertir el orden
 */
-void asignarDestinoEnPila(FILE* fpasm, int es_variable) {
-    // Leemos direccion donde hay que asignar
-    fprintf(fpasm, "\tpop eax\n");
+void asignarDestinoEnPila(FILE* fpasm, int es_variable, int inv) {
+    if (!inv){
+        // Leemos direccion donde hay que asignar
+        fprintf(fpasm, "\tpop eax\n");
 
-    // Leemos valor a asignar
-    fprintf(fpasm, "\tpop ebx\n");
-    if (es_variable)
-        fprintf(fpasm, "\tmov ebx, [ebx]\n");
+        // Leemos valor a asignar
+        fprintf(fpasm, "\tpop ebx\n");
+        if (es_variable)
+            fprintf(fpasm, "\tmov ebx, [ebx]\n");
+    }
+    else{
+        // Leemos valor a asignar
+        fprintf(fpasm, "\tpop ebx\n");
+        if (es_variable)
+            fprintf(fpasm, "\tmov ebx, [ebx]\n");
 
+        // Leemos direccion donde hay que asignar
+        fprintf(fpasm, "\tpop eax\n");
+    }
     // Asignamos el valor
     fprintf(fpasm, "\tmov [eax], ebx\n");    
 }
