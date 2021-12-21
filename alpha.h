@@ -25,6 +25,7 @@ struct _atr_info {
     char *valor;
     int es_direccion;
     int etiqueta;
+    int n;
 };
 typedef struct _atr_info atr_info;
 

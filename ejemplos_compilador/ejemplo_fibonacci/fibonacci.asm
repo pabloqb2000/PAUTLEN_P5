@@ -17,9 +17,11 @@ _fibonacci:
 	lea eax, [ebp + 8]
 	push dword eax
 	push dword 0
+
 	pop dword ebx
 	pop dword eax
 	mov dword eax, [eax]
+
 	cmp eax, ebx
 	je near igual0
 	push dword 0
@@ -38,11 +40,14 @@ fin_igual0:
 	jmp near fin_ifelse0
 fin_then0:
 fin_ifelse0:
-	lea eax, [ebp + 8]	push dword eax
+	lea eax, [ebp + 8]	
+	push dword eax
 	push dword 1
+
 	pop dword ebx
 	pop dword eax
 	mov dword eax, [eax]
+
 	cmp eax, ebx
 	je near igual1
 	push dword 0
@@ -61,8 +66,10 @@ fin_igual1:
 	jmp near fin_ifelse1
 fin_then1:
 fin_ifelse1:
-	lea eax, [ebp + 8]	push dword eax
+	lea eax, [ebp + 8]
+	push dword eax
 	push dword 1
+
 	pop dword ebx
 	pop dword eax
 	mov dword eax, [eax]
@@ -95,6 +102,7 @@ fin_ifelse1:
 	push dword eax
 	lea eax, [ebp - 8]
 	push dword eax
+	
 	pop dword ebx
 	mov dword ebx, [ebx]
 	pop dword eax

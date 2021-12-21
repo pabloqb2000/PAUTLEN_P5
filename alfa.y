@@ -83,6 +83,8 @@ int n_variables_locales = 0;
 %type <atributos> f_nombre
 %type <atributos> f_parametros
 %type <atributos> f_declaracion
+%type <atributos> lista_expresiones
+%type <atributos> resto_lista_expresiones
 %type <atributos> if_tok
 %type <atributos> if_exp
 %type <atributos> if_else_exp
@@ -107,6 +109,7 @@ prog_funciones: prog_declaraciones funciones {
 
 prog_declaraciones: prog_inicio declaraciones {
     escribir_segmento_codigo(out);
+    declaracion = NONE;      
 };
 
 prog_inicio: TOK_MAIN TOK_LLAVEIZQUIERDA {
@@ -120,7 +123,6 @@ declaraciones: declaracion {fprintf(out, ";R2:\t<declaraciones> ::= <declaracion
              ;
 
 declaracion: clase identificadores TOK_PUNTOYCOMA {
-        declaracion = NONE;      
         fprintf(out, ";R4:\t<declaracion> ::= <clase> <identificadores> ;\n");
     }
     ;
@@ -134,11 +136,11 @@ clase_escalar: tipo {fprintf(out, ";R9:\t<clase_escalar> ::= <tipo>\n");}
 
 tipo: TOK_INT {
         tipo_variable = INT;
-        if(declaracion != LOCAL_VARIABLE && declaracion != PARAMETER) declaracion = VARIABLE;
+        if(declaracion == NONE) declaracion = VARIABLE;
         fprintf(out, ";R10:\t<tipo> ::= int\n");}
     | TOK_BOOLEAN {
         tipo_variable = BOOLEAN;
-        if(declaracion != LOCAL_VARIABLE && declaracion != PARAMETER) declaracion = VARIABLE;
+        if(declaracion == NONE) declaracion = VARIABLE;
         fprintf(out, ";R11:\t<tipo> ::= boolean\n");}
     ;
 
@@ -224,12 +226,15 @@ asignacion: identificador TOK_ASIGNACION exp {
         int n = $1.tipo / (MAX_N_TIPOS * MAX_N_CAT);
         int cat = ($1.tipo / MAX_N_TIPOS) % MAX_N_CAT;
         int tipo = $1.tipo % MAX_N_TIPOS;
-        printf("%d, %d, %d\n", n, cat, tipo);
+
+        if(tipo != $3.tipo) {
+            error_semantico("El tipo a asginar es distinto del tipo asignado\n");
+        }
 
         if (cat == VARIABLE) {
             asignar(out, $1.nombre, $3.es_direccion);
         } else if (cat == LOCAL_VARIABLE) {
-            escribirVariableLocal(out, n);
+            escribirVariableLocal(out, n+1);
             asignarDestinoEnPila(out, $3.es_direccion);
         } else if (cat == PARAMETER) {
             escribirParametro(out, n, n_parametros);
@@ -292,7 +297,7 @@ bucle:  bucle_exp TOK_PARENTESISDERECHO TOK_LLAVEIZQUIERDA sentencias TOK_LLAVED
       };
 
 lectura: TOK_SCANF identificador {
-                leer(out, $2.nombre, $2.tipo);
+                leer(out, $2.nombre, $2.tipo % MAX_N_TIPOS);
             };
 
 escritura: TOK_PRINTF exp {
@@ -367,15 +372,15 @@ exp: exp TOK_MAS exp        {
         } else {
             error_semantico("Negacion de valor no booleano");
         }}
-   | TOK_IDENTIFICADOR   {
-        int n = $1.tipo % (MAX_N_TIPOS * MAX_N_CAT);
-        int cat = ($1.tipo / MAX_N_TIPOS) % MAX_N_TIPOS * MAX_N_CAT;
+   | identificador   {
+        int n = $1.tipo / (MAX_N_TIPOS * MAX_N_CAT);
+        int cat = ($1.tipo / MAX_N_TIPOS) % MAX_N_CAT;
         int tipo = $1.tipo % MAX_N_TIPOS;
 
         if (cat == VARIABLE) {
             escribir_operando(out, $1.nombre, TRUE);
         } else if (cat == LOCAL_VARIABLE) {
-            escribirVariableLocal(out, n);
+            escribirVariableLocal(out, n+1);
         } else {
             escribirParametro(out, n, n_parametros);
         }
@@ -383,8 +388,8 @@ exp: exp TOK_MAS exp        {
         $$.es_direccion = TRUE;   
         $$.tipo = tipo;
         }
-   | constante       {
-                        $$.es_direccion = FALSE;    
+   | constante {
+            $$.es_direccion = FALSE;    
             $$.tipo = $1.tipo;
             escribir_operando(out, $1.valor, FALSE);
         }
@@ -396,16 +401,37 @@ exp: exp TOK_MAS exp        {
             $$.tipo = $2.tipo;
         }
    | elemento_vector {fprintf(out, ";R85:\t<exp> ::= <elemento_vector>\n");}
-   | identificador TOK_PARENTESISIZQUIERDO lista_expresiones TOK_PARENTESISDERECHO {fprintf(out, ";R88:\t<exp> ::= <identificador> ( <lista_expresiones> )\n");}
+   | identificador TOK_PARENTESISIZQUIERDO lista_expresiones TOK_PARENTESISDERECHO {
+        int cat = ($1.tipo / MAX_N_TIPOS) % MAX_N_CAT;
+        int tipo = $1.tipo % MAX_N_TIPOS;
+        $$.es_direccion = FALSE;  
+        $$.tipo = tipo;  
+
+        if(cat != FUNCTION){
+            error_semantico("Llamada a objeto no invocable\n");
+        }
+
+        llamarFuncion(out, $1.nombre, $3.n);
+
+        fprintf(out, ";R88:\t<exp> ::= <identificador> ( <lista_expresiones> )\n");
+    }
    ;
 
-lista_expresiones: exp resto_lista_expresiones {fprintf(out, ";R89:\t<lista_expresiones> ::= <exp> <resto_lista_expresiones>\n");}
-	             | {fprintf(out, ";R90:\t<lista_expresiones> ::=\n");} 
+lista_expresiones: resto_lista_expresiones {
+    $$.n = $1.n; 
+    fprintf(out, ";R89:\t<lista_expresiones> ::= <exp> <resto_lista_expresiones>\n");}
+	             | {$$.n = 0; fprintf(out, ";R90:\t<lista_expresiones> ::=\n");} 
                  ;	
                  
-resto_lista_expresiones: TOK_COMA exp resto_lista_expresiones {fprintf(out, ";R91:\t<resto_lista_expresiones> ::= , <exp> <resto_lista_expresiones>\n");}
-	                   | {fprintf(out, ";R92:\t<resto_lista_expresiones> ::=\n");} 
-                       ;
+resto_lista_expresiones: resto_lista_expresiones TOK_COMA exp {
+        $$.n = $1.n+1; 
+        operandoEnPilaAArgumento(out, $3.es_direccion);
+    }
+    | exp {
+        $$.n = 1;
+        operandoEnPilaAArgumento(out, $1.es_direccion);
+        fprintf(out, ";R92:\t<resto_lista_expresiones> ::=\n");} 
+    ;
 
 comparacion: exp TOK_IGUAL exp {
                 if($1.tipo == INT && $3.tipo == INT) {

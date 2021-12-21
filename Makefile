@@ -1,4 +1,4 @@
-TEST = funciones
+TEST = fibonacci
 
 all: clean yanc run_test
 
