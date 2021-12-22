@@ -1,4 +1,4 @@
-TEST = facil
+TEST = custom
 
 all: clean yanc run_test
 
@@ -6,9 +6,9 @@ run:
 	./test
 
 run_test:
-	./yanc ejemplos_compilador/ejemplo_$(TEST)/$(TEST).alfa ejemplos_compilador/ejemplo_$(TEST)/out.asm
-	nasm -g -o ejemplos_compilador/ejemplo_$(TEST)/out.o -f elf32 ejemplos_compilador/ejemplo_$(TEST)/out.asm
-	gcc -Wall -g -m32 -o test ejemplos_compilador/ejemplo_$(TEST)/out.o alfalib.o
+	./yanc ejs/ejemplo_$(TEST)/$(TEST).alfa ejs/ejemplo_$(TEST)/out.asm
+	nasm -g -o ejs/ejemplo_$(TEST)/out.o -f elf32 ejs/ejemplo_$(TEST)/out.asm
+	gcc -Wall -g -m32 -o test ejs/ejemplo_$(TEST)/out.o alfalib.o
 	./test
 
 yanc: y.tab.o lex.yy.o yanc.o generacion.o sym_table.o hash_table.o

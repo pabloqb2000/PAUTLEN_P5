@@ -181,7 +181,7 @@ f_nombre: TOK_FUNCTION tipo TOK_IDENTIFICADOR {
     };
 
 f_parametros: f_nombre TOK_PARENTESISIZQUIERDO parametros_funcion {
-    $$.nombre = $1.nombre;
+    strcpy($$.nombre, $1.nombre);
     $$.tipo = $1.tipo;
     declaracion = LOCAL_VARIABLE;
 };
@@ -201,7 +201,7 @@ f_declaracion: f_parametros TOK_PARENTESISDERECHO TOK_LLAVEIZQUIERDA declaracion
         };
 
 funcion: f_declaracion sentencias TOK_LLAVEDERECHA {
-            char msg[1024];
+            char msg[1200];
 
             if(!hay_retorno) {
                 sprintf(msg, "Funcion %s sin sentencia de retorno", $1.nombre);
@@ -479,7 +479,7 @@ exp: exp TOK_MAS exp        {
         int n = $1.tipo / (MAX_N_TIPOS * MAX_N_CAT * MAX_N_DIM);
         int cat = ($1.tipo / MAX_N_TIPOS) % MAX_N_CAT;
         int tipo = $1.tipo % MAX_N_TIPOS;
-        char msg[1024];
+        char msg[1200];
         $$.es_direccion = FALSE;  
         $$.tipo = tipo;  
 
@@ -488,7 +488,7 @@ exp: exp TOK_MAS exp        {
         }
 
         if(n != $3.n) {
-            sprintf("Numero incorrecto de parametros en llamada a funcion. (Se tienen: %d, se esperaban: %d)", $3.n, n);
+            sprintf(msg, "Numero incorrecto de parametros en llamada a funcion. (Se tienen: %d, se esperaban: %d)", $3.n, n);
             error_semantico(msg);
         }
 
@@ -585,7 +585,7 @@ constante_entera: TOK_CONSTANTE_ENTERA {$$.tipo = INT; $$.valor = yylval.atribut
                 ;
 
 identificador: TOK_IDENTIFICADOR {
-        char msg[1024];
+        char msg[1200];
         if(declaracion == VARIABLE) {
             if(stable_insert(
                 table, 
@@ -604,7 +604,7 @@ identificador: TOK_IDENTIFICADOR {
             strcpy($$.nombre, yylval.atributos.nombre);
             $$.tipo = stable_search(table, yylval.atributos.nombre);
             if($$.tipo == ERROR) {
-                sprintf("Acceso a variable no declarada (%s)", yylval.atributos.nombre);
+                sprintf(msg, "Acceso a variable no declarada (%s)", yylval.atributos.nombre);
                 error_semantico(msg);
             }
             $$.es_direccion = TRUE;
@@ -622,7 +622,7 @@ identificador: TOK_IDENTIFICADOR {
             n_parametros++;
         } else if (declaracion == LOCAL_VARIABLE) {
             if(tam_vector > 1) {
-                error_semantico("Variable local de tipo no escalar.")
+                error_semantico("Variable local de tipo no escalar.");
             }
             if(stable_insert(
                 table, 
