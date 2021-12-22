@@ -22,6 +22,8 @@ int n_parametros = 0;
 int n_variables_locales = 0;
 int tam_vector = 1;
 int es_vector = ESCALAR;
+int hay_retorno = FALSE;
+int es_func = FALSE;
 %}
 
 %union {
@@ -152,10 +154,12 @@ tipo: TOK_INT {
     ;
 
 clase_vector: TOK_ARRAY tipo TOK_CORCHETEIZQUIERDO constante_entera TOK_CORCHETEDERECHO {
-    tam_vector = atoi($4.valor);
-    es_vector = VECTOR;
-    }
-            ;
+        tam_vector = atoi($4.valor);
+        if(tam_vector < 1 || tam_vector > 64) {
+            error_semantico("El tamanyo del vector excede los limites permitidos (1,64).");
+        }
+        es_vector = VECTOR;
+    };
 
 identificadores: identificador {
                                     }
@@ -170,27 +174,46 @@ funciones: funcion funciones {
          ;
 
 f_nombre: TOK_FUNCTION tipo TOK_IDENTIFICADOR {
-        open_ambit(table, yylval.atributos.nombre, FUNCTION*MAX_N_TIPOS + $2.tipo);
         declaracion = PARAMETER;
+        es_func = TRUE;
         strcpy($$.nombre, yylval.atributos.nombre);
+        $$.tipo = $2.tipo;
     };
 
 f_parametros: f_nombre TOK_PARENTESISIZQUIERDO parametros_funcion {
-
+    $$.nombre = $1.nombre;
+    $$.tipo = $1.tipo;
     declaracion = LOCAL_VARIABLE;
 };
 
-f_declaracion: f_parametros TOK_PARENTESISDERECHO TOK_LLAVEIZQUIERDA declaraciones_funcion {
+f_declaracion: f_parametros TOK_PARENTESISDERECHO TOK_LLAVEIZQUIERDA declaraciones_funcion {    
+            open_ambit(
+                table,
+                $1.nombre, 
+                n_parametros*MAX_N_TIPOS*MAX_N_CAT*MAX_N_DIM + 
+                FUNCTION*MAX_N_TIPOS +
+                $1.tipo
+            );
+            
             declararFuncion(out, $1.nombre, n_variables_locales);
 
             declaracion = NONE;
-                    };
+        };
 
 funcion: f_declaracion sentencias TOK_LLAVEDERECHA {
+            char msg[1024];
+
+            if(!hay_retorno) {
+                sprintf(msg, "Funcion %s sin sentencia de retorno", $1.nombre);
+                error_semantico(msg);
+            }
+
             n_parametros = 0;
             n_variables_locales = 0;
+            hay_retorno = FALSE;
+            es_func = FALSE;
             close_ambit(table);
-                        };
+        };
 
 parametros_funcion: parametro_funcion resto_parametros_funcion {}
                   |  {}   
@@ -233,11 +256,11 @@ asignacion: identificador TOK_ASIGNACION exp {
         int tipo = $1.tipo % MAX_N_TIPOS;
 
         if(tipo != $3.tipo) {
-            error_semantico("El tipo a asginar es distinto del tipo asignado\n");
+            error_semantico("Asignacion incompatible");
         }
 
         if(dim != ESCALAR) {
-            error_semantico("No se puede asignar un valor a un vector sin indicar su indice\n");
+            error_semantico("No se puede asignar un valor a un vector sin indicar su indice");
         }
 
         if (cat == VARIABLE) {
@@ -249,18 +272,17 @@ asignacion: identificador TOK_ASIGNACION exp {
             escribirParametro(out, n, n_parametros);
             asignarDestinoEnPila(out, $3.es_direccion, FALSE);
         } else {
-            error_semantico("No se puede asignar valores a una funcion\n");
+            error_semantico("No se puede asignar valores a una funcion");
         }
 
     }
     | asignacion_vector exp {
-
         if($1.tipo != $2.tipo % MAX_N_TIPOS) {
-            error_semantico("Tipos incompatibles\n");
+            error_semantico("Asignacion incompatible");
         }
 
         asignarDestinoEnPila(out, $2.es_direccion, TRUE);
-        };
+    };
 
 asignacion_vector: elemento_vector TOK_ASIGNACION {
         int n = $1.tipo / (MAX_N_TIPOS * MAX_N_CAT * MAX_N_DIM);
@@ -271,11 +293,17 @@ asignacion_vector: elemento_vector TOK_ASIGNACION {
     };
 
 elemento_vector: identificador TOK_CORCHETEIZQUIERDO exp TOK_CORCHETEDERECHO {
+        int dim = ($1.tipo / (MAX_N_TIPOS * MAX_N_CAT)) % MAX_N_DIM;
+        if(dim != VECTOR) {
+            error_semantico("Intento de indexacion de una variable que no es de tipo vector.");
+        }
+
         strcpy($$.nombre, $1.nombre);
         $$.es_direccion = $3.es_direccion;
         $$.tipo = $1.tipo;
+
         if($3.tipo != INT) {
-            error_semantico("Solo se puede indexar con variables enteras\n");
+            error_semantico("El indice en una operacion de indexacion tiene que ser de tipo entero");
         }
     };
 
@@ -313,6 +341,9 @@ while: TOK_WHILE TOK_PARENTESISIZQUIERDO{
       };
 
 bucle_exp:  while exp {
+              if($2.tipo != BOOLEAN) {
+                  error_semantico("Bucle con condicion de tipo int");
+              }
               $$.etiqueta = $1.etiqueta;
               while_exp_pila(out, $2.es_direccion, $1.etiqueta);
             };
@@ -330,7 +361,12 @@ escritura: TOK_PRINTF exp {
             };
 
 retorno_funcion: TOK_RETURN exp {
-    retornarFuncion(out, $2.es_direccion);
+        if(!es_func) {
+            error_semantico("Sentencia de retorno fuera del cuerpo de una función");
+        }
+
+        hay_retorno = TRUE;
+        retornarFuncion(out, $2.es_direccion);
     };
 
 exp: exp TOK_MAS exp        {
@@ -339,7 +375,7 @@ exp: exp TOK_MAS exp        {
             $$.es_direccion = FALSE;
             sumar(out, $1.es_direccion, $3.es_direccion);
         } else {
-            error_semantico("Operandos de la suma no enteros");
+            error_semantico("Operacion aritmetica con operandos boolean");
         }}  
    | exp TOK_MENOS exp       {
        if($1.tipo == INT && $3.tipo == INT) {
@@ -347,7 +383,7 @@ exp: exp TOK_MAS exp        {
             $$.es_direccion = FALSE;    
             restar(out, $1.es_direccion, $3.es_direccion);
         } else {
-            error_semantico("Operandos de la resta no enteros");
+            error_semantico("Operacion aritmetica con operandos boolean");
         }}
    | exp TOK_DIVISION exp    {
         if($1.tipo == INT && $3.tipo == INT) {
@@ -355,7 +391,7 @@ exp: exp TOK_MAS exp        {
             $$.tipo = INT;
             dividir(out, $1.es_direccion, $3.es_direccion);
         } else {
-            error_semantico("Operandos de la división no enteros");
+            error_semantico("Operacion aritmetica con operandos boolean");
         }}
    | exp TOK_ASTERISCO exp   {
         if($1.tipo == INT && $3.tipo == INT) {
@@ -363,7 +399,7 @@ exp: exp TOK_MAS exp        {
             $$.tipo = INT;
             multiplicar(out, $1.es_direccion, $3.es_direccion);
         } else {
-            error_semantico("Operandos de la multiplicacion no enteros");
+            error_semantico("Operacion aritmetica con operandos boolean");
         }}
    | TOK_MENOS exp   {
         if($2.tipo == INT) {
@@ -371,7 +407,7 @@ exp: exp TOK_MAS exp        {
             $$.tipo = INT;
             cambiar_signo(out, $2.es_direccion);
         } else {
-            error_semantico("Valor negativo no entero");
+            error_semantico("Operacion aritmetica con operandos boolean");
         }}
    | exp TOK_AND exp {
         if($1.tipo == BOOLEAN && $3.tipo == BOOLEAN) {
@@ -379,7 +415,7 @@ exp: exp TOK_MAS exp        {
             $$.tipo = BOOLEAN;
             y(out, $1.es_direccion, $3.es_direccion);
         } else {
-            error_semantico("Operandos de AND no booleanos");
+            error_semantico("Operacion logica con operandos int");
         }} 
    | exp TOK_OR exp  {
         if($1.tipo == BOOLEAN && $3.tipo == BOOLEAN) {
@@ -387,7 +423,7 @@ exp: exp TOK_MAS exp        {
             $$.tipo = BOOLEAN;
             o(out, $1.es_direccion, $3.es_direccion);
         } else {
-            error_semantico("Operandos de OR no boolenanos");
+            error_semantico("Operacion logica con operandos int");
         }} 
    | TOK_NOT exp     {
         if($2.tipo == BOOLEAN) {
@@ -395,7 +431,7 @@ exp: exp TOK_MAS exp        {
             $$.tipo = BOOLEAN;
             no(out, $2.es_direccion);
         } else {
-            error_semantico("Negacion de valor no booleano");
+            error_semantico("Operacion logica con operandos int");
         }}
    | identificador   {
         int n = $1.tipo / (MAX_N_TIPOS * MAX_N_CAT * MAX_N_DIM);
@@ -441,26 +477,31 @@ exp: exp TOK_MAS exp        {
     }
    | identificador TOK_PARENTESISIZQUIERDO lista_expresiones TOK_PARENTESISDERECHO {   
         int n = $1.tipo / (MAX_N_TIPOS * MAX_N_CAT * MAX_N_DIM);
-        int dim = ($1.tipo / (MAX_N_TIPOS * MAX_N_CAT)) % MAX_N_DIM;
         int cat = ($1.tipo / MAX_N_TIPOS) % MAX_N_CAT;
         int tipo = $1.tipo % MAX_N_TIPOS;
+        char msg[1024];
         $$.es_direccion = FALSE;  
         $$.tipo = tipo;  
 
         if(cat != FUNCTION){
-            error_semantico("Llamada a objeto no invocable\n");
+            error_semantico("Llamada a objeto no invocable");
+        }
+
+        if(n != $3.n) {
+            sprintf("Numero incorrecto de parametros en llamada a funcion. (Se tienen: %d, se esperaban: %d)", $3.n, n);
+            error_semantico(msg);
         }
 
         llamarFuncion(out, $1.nombre, $3.n);
 
-            }
-   ;
+    };
 
 lista_expresiones: resto_lista_expresiones {
-    $$.n = $1.n; 
+        $$.n = $1.n; 
     }
-	             | {$$.n = 0; } 
-                 ;	
+    | {
+        $$.n = 0; 
+    };	
                  
 resto_lista_expresiones: resto_lista_expresiones TOK_COMA exp {
         $$.n = $1.n+1; 
@@ -480,7 +521,7 @@ comparacion: exp TOK_IGUAL exp {
                     $$.etiqueta = etiqueta;
                     etiqueta++;
                 } else {
-                    error_semantico("Operandos de comparación no enteros");
+                    error_semantico("Comparacion con operandos boolean");
                 }} 
  	       | exp TOK_DISTINTO exp {
                 if($1.tipo == INT && $3.tipo == INT) {
@@ -489,7 +530,7 @@ comparacion: exp TOK_IGUAL exp {
                     distinto(out,$1.es_direccion,$3.es_direccion,$$.etiqueta);
                     $$.etiqueta++;
                 } else {
-                    error_semantico("Operandos de comparación no enteros");
+                    error_semantico("Comparacion con operandos boolean");
                 }} 
  	       | exp TOK_MENORIGUAL exp {
                 if($1.tipo == INT && $3.tipo == INT) {
@@ -499,7 +540,7 @@ comparacion: exp TOK_IGUAL exp {
                     $$.etiqueta = etiqueta;
                     etiqueta++;
                 } else {
-                    error_semantico("Operandos de comparación no enteros");
+                    error_semantico("Comparacion con operandos boolean");
                 }}  
  	       | exp TOK_MAYORIGUAL exp {
                 if($1.tipo == INT && $3.tipo == INT) {
@@ -509,7 +550,7 @@ comparacion: exp TOK_IGUAL exp {
                     $$.etiqueta = etiqueta;
                     etiqueta++;
                 } else {
-                    error_semantico("Operandos de comparación no enteros");
+                    error_semantico("Comparacion con operandos boolean");
                 }}  
  	       | exp TOK_MENOR exp  {
                 if($1.tipo == INT && $3.tipo == INT) {
@@ -519,7 +560,7 @@ comparacion: exp TOK_IGUAL exp {
                     $$.etiqueta = etiqueta;
                     etiqueta++;
                 } else {
-                    error_semantico("Operandos de comparación no enteros");
+                    error_semantico("Comparacion con operandos boolean");
                 }}  
  	       | exp TOK_MAYOR exp  {
                 if($1.tipo == INT && $3.tipo == INT) {
@@ -529,9 +570,7 @@ comparacion: exp TOK_IGUAL exp {
                     $$.etiqueta = etiqueta;
                     etiqueta++;
                 } else {
-                    char str[128];
-                    sprintf(str, "Operandos de comparación no enteros (%d y %d)", $1.tipo, $3.tipo);
-                    error_semantico(str);
+                    error_semantico("Comparacion con operandos boolean");
                 }}
            ;
 
@@ -546,6 +585,7 @@ constante_entera: TOK_CONSTANTE_ENTERA {$$.tipo = INT; $$.valor = yylval.atribut
                 ;
 
 identificador: TOK_IDENTIFICADOR {
+        char msg[1024];
         if(declaracion == VARIABLE) {
             if(stable_insert(
                 table, 
@@ -554,7 +594,8 @@ identificador: TOK_IDENTIFICADOR {
                     es_vector * MAX_N_CAT * MAX_N_TIPOS +
                     VARIABLE * MAX_N_TIPOS +
                     tipo_variable) == ERROR) {
-                error_semantico("El identificador ya existe.");
+                sprintf(msg, "Declaracion duplicada (%s)", yylval.atributos.nombre);
+                error_semantico(msg);
             }
             
             declarar_variable(out, yylval.atributos.nombre, tipo_variable, tam_vector);
@@ -562,6 +603,10 @@ identificador: TOK_IDENTIFICADOR {
         } else if (declaracion == NONE) {
             strcpy($$.nombre, yylval.atributos.nombre);
             $$.tipo = stable_search(table, yylval.atributos.nombre);
+            if($$.tipo == ERROR) {
+                sprintf("Acceso a variable no declarada (%s)", yylval.atributos.nombre);
+                error_semantico(msg);
+            }
             $$.es_direccion = TRUE;
         } else if (declaracion == PARAMETER) {
             if(stable_insert(
@@ -571,10 +616,14 @@ identificador: TOK_IDENTIFICADOR {
                     es_vector * MAX_N_CAT * MAX_N_TIPOS +
                     PARAMETER * MAX_N_TIPOS +
                     tipo_variable) == ERROR) {
-                error_semantico("El identificador ya existe.");
+                sprintf(msg, "Declaracion duplicada (%s)", yylval.atributos.nombre);
+                error_semantico(msg);
             }
             n_parametros++;
         } else if (declaracion == LOCAL_VARIABLE) {
+            if(tam_vector > 1) {
+                error_semantico("Variable local de tipo no escalar.")
+            }
             if(stable_insert(
                 table, 
                 yylval.atributos.nombre,
@@ -582,7 +631,8 @@ identificador: TOK_IDENTIFICADOR {
                     es_vector * MAX_N_CAT * MAX_N_TIPOS +
                     LOCAL_VARIABLE * MAX_N_TIPOS +
                     tipo_variable) == ERROR) {
-                error_semantico("El identificador ya existe.");
+                sprintf(msg, "Declaracion duplicada (%s)", yylval.atributos.nombre);
+                error_semantico(msg);
             }
             n_variables_locales++;
         }
