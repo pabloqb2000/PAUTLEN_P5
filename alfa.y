@@ -15,15 +15,15 @@ extern long yycol;
 extern int yy_morph_error;
 
 stable* table;
-int tipo_variable;
-int etiqueta = 0;
-int declaracion = NONE;
-int n_parametros = 0;
-int n_variables_locales = 0;
-int tam_vector = 1;
-int es_vector = ESCALAR;
-int hay_retorno = FALSE;
-int es_func = FALSE;
+int tipo_variable; // Tipo de variable que estamos declarando
+int etiqueta = 0;  // Numero de la etiqueta a utilizar en el proximo condicional
+int declaracion = NONE; // Que es lo que estamos declarando (categorias (CAT))
+int n_parametros = 0;   // Numero de parametros en una funcion
+int n_variables_locales = 0; // Numero de variables locales en una funcion
+int tam_vector = 1; // tamano vector
+int es_vector = ESCALAR; // DIM
+int hay_retorno = FALSE; // Si se ha detectado una instruccion return
+int es_func = FALSE; // es o no funcion
 %}
 
 %union {
